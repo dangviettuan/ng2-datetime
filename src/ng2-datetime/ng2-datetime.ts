@@ -1,9 +1,9 @@
 import {
-    Component, Input, HostListener, AfterViewInit, OnDestroy,
-    SimpleChanges, OnChanges, HostBinding, forwardRef
+    Component, Input, HostListener, AfterViewInit, OnInit, OnDestroy,
+    SimpleChanges, OnChanges, HostBinding, forwardRef, ViewChild, ElementRef
 } from '@angular/core';
-import {ControlValueAccessor, NG_VALUE_ACCESSOR} from '@angular/forms';
-import {ITimepickerEvent} from './ITimepickerEvent';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import { ITimepickerEvent } from './ITimepickerEvent';
 
 const CUSTOM_ACCESSOR = {
     provide: NG_VALUE_ACCESSOR,
@@ -15,9 +15,9 @@ const CUSTOM_ACCESSOR = {
     selector: 'datetime',
     providers: [CUSTOM_ACCESSOR],
     template: `
-        <div class="ng2-datetime">
-            <div [ngClass]="{ 'input-group': !datepickerOptions.hideIcon, 'date': true }">
-                <input id="{{idDatePicker}}" type="text" class="form-control"
+        <div class="form-inline ng2-datetime">
+            <div *ngIf="showDate" [ngClass]="{ 'form-group': true, 'input-group': !datepickerOptions.hideIcon, 'date': true }">
+                <input #dateinput type="text" class="form-control"
                        [attr.readonly]="readonly"
                        [attr.required]="required"
                        [attr.placeholder]="datepickerOptions.placeholder || 'Choose date'"
@@ -31,8 +31,8 @@ const CUSTOM_ACCESSOR = {
                     <span [ngClass]="datepickerOptions.icon || 'glyphicon glyphicon-th'"></span>
                 </div>
             </div>
-            <div [ngClass]="{ 'input-group': !timepickerOptions.hideIcon, 'bootstrap-timepicker timepicker': true }">
-                <input id="{{idTimePicker}}" type="text" class="form-control input-small"
+            <div *ngIf="showTime" [ngClass]="{ 'form-group': true, 'input-group': !timepickerOptions.hideIcon, 'bootstrap-timepicker timepicker': true }">
+                <input #timeinput type="text" class="form-control input-small"
                        [attr.readonly]="readonly"
                        [attr.required]="required"
                        [attr.placeholder]="timepickerOptions.placeholder || 'Set time'"
@@ -53,13 +53,19 @@ const CUSTOM_ACCESSOR = {
     ]
 })
 
-export class NKDatetime implements ControlValueAccessor, AfterViewInit, OnDestroy, OnChanges {
+export class NKDatetime implements ControlValueAccessor, AfterViewInit, OnInit, OnDestroy, OnChanges {
     @Input('timepicker') timepickerOptions: any = {};
     @Input('datepicker') datepickerOptions: any = {};
     @Input('hasClearButton') hasClearButton: boolean;
     @Input() readonly: boolean;
     @Input() required: boolean;
     @Input() tabindex: string;
+
+
+    @ViewChild('dateinput') dateinput: ElementRef;
+    @ViewChild('timeinput') timeinput: ElementRef;
+    showDate = true;
+    showTime = true;
 
     date: Date; // ngModel
     dateModel: string;
@@ -84,8 +90,17 @@ export class NKDatetime implements ControlValueAccessor, AfterViewInit, OnDestro
         return this.tabindex === undefined ? '-1' : undefined;
     }
 
+    ngOnInit() {
+        if (this.datepickerOptions === false) {
+            this.showDate = false;
+        }
+        if (this.timepickerOptions === false) {
+            this.showTime = false;
+        }
+    }
     ngAfterViewInit() {
         this.init();
+
     }
 
     ngOnDestroy() {
@@ -144,10 +159,10 @@ export class NKDatetime implements ControlValueAccessor, AfterViewInit, OnDestro
     checkEmptyValue(e: any) {
         const value = e.target.value;
         if (value === '' && (
-                this.timepickerOptions === false ||
-                this.datepickerOptions === false ||
-                (this.timeModel === '' && this.dateModel === '')
-            )) {
+            this.timepickerOptions === false ||
+            this.datepickerOptions === false ||
+            (this.timeModel === '' && this.dateModel === '')
+        )) {
             this.onChange(undefined);
         }
     }
@@ -165,6 +180,8 @@ export class NKDatetime implements ControlValueAccessor, AfterViewInit, OnDestro
     }
 
     showDatepicker() {
+
+        console.log(this.datepicker);
         this.datepicker.datepicker('show');
     }
 
@@ -172,8 +189,8 @@ export class NKDatetime implements ControlValueAccessor, AfterViewInit, OnDestro
 
     private init(): void {
         if (!this.datepicker && this.datepickerOptions !== false) {
-            let options = jQuery.extend({enableOnReadonly: !this.readonly}, this.datepickerOptions);
-            this.datepicker = (<any>$('#' + this.idDatePicker)).datepicker(options);
+            let options = jQuery.extend({ enableOnReadonly: !this.readonly }, this.datepickerOptions);
+            this.datepicker = (<any>$(this.dateinput.nativeElement)).datepicker(options);
             this.datepicker
                 .on('changeDate', (e: any) => {
                     let newDate: Date = e.date;
@@ -188,16 +205,14 @@ export class NKDatetime implements ControlValueAccessor, AfterViewInit, OnDestro
                     this.date = newDate;
                     this.onChange(newDate);
                 });
-        } else if (this.datepickerOptions === false) {
-            (<any>$('#' + this.idDatePicker)).remove();
         }
 
         if (!this.timepicker && this.timepickerOptions !== false) {
-            let options = jQuery.extend({defaultTime: false}, this.timepickerOptions);
-            this.timepicker = (<any>$('#' + this.idTimePicker)).timepicker(options);
+            let options = jQuery.extend({ defaultTime: false }, this.timepickerOptions);
+            this.timepicker = (<any>$(this.timeinput.nativeElement)).timepicker(options);
             this.timepicker
                 .on('changeTime.timepicker', (e: ITimepickerEvent) => {
-                    let {meridian, hours} = e.time;
+                    let { meridian, hours } = e.time;
 
                     if (meridian) {
                         // has meridian -> convert 12 to 24h
@@ -207,7 +222,7 @@ export class NKDatetime implements ControlValueAccessor, AfterViewInit, OnDestro
                         if (meridian === 'AM' && hours === 12) {
                             hours = hours - 12;
                         }
-                        hours = parseInt(this.pad(hours), 10);
+                        hours = parseInt(this.pad(hours));
                     }
 
                     if (!isDate(this.date)) {
@@ -220,8 +235,6 @@ export class NKDatetime implements ControlValueAccessor, AfterViewInit, OnDestro
                     this.date.setSeconds(e.time.seconds);
                     this.onChange(this.date);
                 });
-        } else if (this.timepickerOptions === false) {
-            (<any>$('#' + this.idTimePicker)).parent().remove();
         }
 
         this.updateModel(this.date);
